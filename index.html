@@ -1,0 +1,1088 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="An HTML5-first, HTMX-aware compatibility architecture prototype with a component registry and markup validator.">
+  <title>Unified HTML5 Compatibility Layer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --color-bg: #0b1020;
+      --color-surface: #111a2e;
+      --color-surface-raised: #16223a;
+      --color-surface-soft: #1b2943;
+      --color-border: #293854;
+      --color-text: #edf3ff;
+      --color-muted: #9aabc5;
+      --color-accent: #7c9cff;
+      --color-accent-strong: #9db4ff;
+      --color-cyan: #63d5d1;
+      --color-green: #67d7a3;
+      --color-amber: #f0bf72;
+      --color-red: #ff8585;
+      --shadow-soft: 0 18px 60px rgb(0 0 0 / 24%);
+      --radius-sm: 10px;
+      --radius-md: 16px;
+      --radius-lg: 24px;
+      --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --sidebar-width: 250px;
+    }
+
+    [data-theme="light"] {
+      color-scheme: light;
+      --color-bg: #f4f7fc;
+      --color-surface: #ffffff;
+      --color-surface-raised: #f7f9fd;
+      --color-surface-soft: #edf2fb;
+      --color-border: #dce4f1;
+      --color-text: #15213a;
+      --color-muted: #65738d;
+      --color-accent: #496fe0;
+      --color-accent-strong: #345bd0;
+      --color-cyan: #168e91;
+      --color-green: #168557;
+      --color-amber: #a66a11;
+      --color-red: #bf3434;
+      --shadow-soft: 0 18px 60px rgb(32 48 76 / 10%);
+    }
+
+    *,
+    *::before,
+    *::after { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(circle at 78% 3%, rgb(89 118 219 / 14%), transparent 27rem),
+        var(--color-bg);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      line-height: 1.55;
+    }
+
+    button,
+    input,
+    textarea { font: inherit; }
+
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+
+    a { color: var(--color-accent-strong); }
+    code, pre, kbd { font-family: var(--font-mono); }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 26px 18px 18px;
+      border-right: 1px solid var(--color-border);
+      background: color-mix(in srgb, var(--color-surface) 91%, transparent);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 9px 27px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border: 1px solid rgb(124 156 255 / 40%);
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgb(124 156 255 / 25%), rgb(99 213 209 / 12%));
+      color: var(--color-accent-strong);
+      font-size: 20px;
+      font-weight: 800;
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 10%);
+    }
+
+    .brand-name { margin: 0; font-size: 13px; font-weight: 760; letter-spacing: .02em; }
+    .brand-subtitle { margin: 2px 0 0; color: var(--color-muted); font-size: 11px; }
+    .nav-label { padding: 0 12px 9px; color: var(--color-muted); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+
+    .nav-list { display: grid; gap: 5px; }
+
+    .nav-button {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--color-muted);
+      text-align: left;
+      transition: background .18s ease, color .18s ease, border-color .18s ease;
+    }
+
+    .nav-button:hover,
+    .nav-button[aria-current="page"] {
+      border-color: var(--color-border);
+      background: var(--color-surface-soft);
+      color: var(--color-text);
+    }
+
+    .nav-icon { display: inline-grid; width: 20px; place-items: center; font-size: 15px; }
+    .nav-text { font-size: 13px; font-weight: 650; }
+    .sidebar-spacer { flex: 1; }
+
+    .sidebar-note {
+      padding: 14px;
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      background: var(--color-surface-raised);
+    }
+
+    .sidebar-note strong { display: block; margin-bottom: 4px; font-size: 11px; }
+    .sidebar-note p { margin: 0; color: var(--color-muted); font-size: 11px; }
+    .sidebar-footer { padding: 16px 8px 0; color: var(--color-muted); font-size: 10px; }
+
+    .main-area { min-width: 0; }
+
+    .topbar {
+      position: sticky;
+      z-index: 10;
+      top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 72px;
+      padding: 14px clamp(20px, 4vw, 54px);
+      border-bottom: 1px solid var(--color-border);
+      background: color-mix(in srgb, var(--color-bg) 86%, transparent);
+      backdrop-filter: blur(18px);
+    }
+
+    .breadcrumb { color: var(--color-muted); font-size: 12px; }
+    .breadcrumb strong { color: var(--color-text); font-weight: 650; }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+    .runtime-pill,
+    .version-pill,
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 10px;
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      background: var(--color-surface);
+      color: var(--color-muted);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: .04em;
+      white-space: nowrap;
+    }
+
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-green) 16%, transparent); }
+
+    .icon-button {
+      display: inline-grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border: 1px solid var(--color-border);
+      border-radius: 11px;
+      background: var(--color-surface);
+      color: var(--color-text);
+    }
+
+    .icon-button:hover { border-color: var(--color-accent); }
+
+    .content {
+      width: min(1480px, 100%);
+      margin: 0 auto;
+      padding: 42px clamp(20px, 4vw, 54px) 70px;
+    }
+
+    .view { display: none; animation: rise-in .22s ease both; }
+    .view.is-active { display: block; }
+
+    @keyframes rise-in {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 15px;
+      color: var(--color-cyan);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before { width: 19px; height: 1px; background: currentColor; content: ""; }
+
+    h1, h2, h3, p { overflow-wrap: anywhere; }
+    h1 { max-width: 850px; margin: 0; font-size: clamp(34px, 5vw, 62px); line-height: 1.06; letter-spacing: -.055em; }
+    h1 .accent { color: var(--color-accent-strong); }
+    .hero-copy { max-width: 740px; margin: 19px 0 0; color: var(--color-muted); font-size: 15px; }
+
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 25px; }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 9px 15px;
+      border: 1px solid var(--color-border);
+      border-radius: 11px;
+      background: var(--color-surface-raised);
+      color: var(--color-text);
+      font-size: 12px;
+      font-weight: 750;
+      text-decoration: none;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease;
+    }
+
+    .button:hover { transform: translateY(-1px); border-color: var(--color-accent); }
+    .button-primary { border-color: transparent; background: linear-gradient(125deg, #6f8ff3, #5d77d8); color: white; box-shadow: 0 8px 24px rgb(83 111 210 / 22%); }
+    .button-primary:hover { background: linear-gradient(125deg, #829eff, #6c86e8); }
+    .button-small { min-height: 32px; padding: 6px 10px; font-size: 11px; }
+
+    .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-top: 35px; }
+
+    .metric-card,
+    .panel,
+    .feature-card,
+    .adapter-card {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: linear-gradient(145deg, var(--color-surface), color-mix(in srgb, var(--color-surface-raised) 80%, transparent));
+      box-shadow: var(--shadow-soft);
+    }
+
+    .metric-card { min-height: 112px; padding: 17px; }
+    .metric-label { color: var(--color-muted); font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    .metric-value { display: block; margin-top: 9px; font-size: 28px; font-weight: 780; letter-spacing: -.05em; }
+    .metric-detail { color: var(--color-muted); font-size: 10px; }
+
+    .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin: 45px 0 17px; }
+    .section-heading h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
+    .section-heading p { margin: 5px 0 0; color: var(--color-muted); font-size: 12px; }
+    .section-kicker { color: var(--color-cyan); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+
+    .feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .feature-card { min-height: 180px; padding: 20px; }
+    .feature-icon { display: grid; width: 36px; height: 36px; place-items: center; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface-soft); font-size: 16px; }
+    .feature-card h3 { margin: 14px 0 6px; font-size: 14px; }
+    .feature-card p { margin: 0; color: var(--color-muted); font-size: 12px; }
+
+    .panel { padding: 20px; }
+    .panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 16px; }
+    .panel-header h3 { margin: 0; font-size: 15px; }
+    .panel-header p { margin: 4px 0 0; color: var(--color-muted); font-size: 11px; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--color-border); border-radius: 12px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--color-border); vertical-align: top; }
+    th { background: var(--color-surface-raised); color: var(--color-muted); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    td { font-size: 11px; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td code { color: var(--color-accent-strong); font-size: 10px; }
+    .muted { color: var(--color-muted); }
+
+    .flow-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+    .flow-step { position: relative; min-height: 112px; padding: 15px; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface-raised); }
+    .flow-number { color: var(--color-cyan); font-family: var(--font-mono); font-size: 10px; }
+    .flow-step strong { display: block; margin-top: 9px; font-size: 12px; }
+    .flow-step span:last-child { display: block; margin-top: 4px; color: var(--color-muted); font-size: 10px; }
+
+    .page-title { margin: 0; font-size: clamp(28px, 4vw, 42px); letter-spacing: -.045em; }
+    .page-description { max-width: 760px; margin: 10px 0 25px; color: var(--color-muted); font-size: 13px; }
+
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .search-input,
+    .text-input,
+    .code-input {
+      width: 100%;
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      outline: none;
+      background: var(--color-surface-raised);
+      color: var(--color-text);
+    }
+
+    .search-input, .text-input { min-height: 39px; padding: 8px 12px; font-size: 12px; }
+    .search-input { max-width: 330px; }
+    .search-input:focus, .text-input:focus, .code-input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgb(124 156 255 / 12%); }
+
+    .registry-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .registry-card { padding: 17px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); }
+    .registry-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .registry-card h3 { margin: 0; font-size: 13px; }
+    .registry-card p { margin: 7px 0 12px; color: var(--color-muted); font-size: 11px; }
+    .registry-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 7px;
+      border: 1px solid var(--color-border);
+      border-radius: 7px;
+      background: var(--color-surface-soft);
+      color: var(--color-muted);
+      font-family: var(--font-mono);
+      font-size: 9px;
+    }
+
+    .registry-id { color: var(--color-accent-strong); font-family: var(--font-mono); font-size: 10px; }
+    .empty-state { grid-column: 1 / -1; padding: 25px; border: 1px dashed var(--color-border); border-radius: 12px; color: var(--color-muted); text-align: center; font-size: 12px; }
+
+    .validator-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 14px; align-items: start; }
+    .code-input { display: block; min-height: 390px; padding: 15px; resize: vertical; font-family: var(--font-mono); font-size: 11px; line-height: 1.7; tab-size: 2; white-space: pre; }
+    .editor-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+    .editor-hint { color: var(--color-muted); font-size: 10px; }
+    .validation-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 13px; }
+    .summary-item { padding: 12px; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface-raised); }
+    .summary-item strong { display: block; font-size: 22px; }
+    .summary-item span { color: var(--color-muted); font-size: 9px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    .diagnostic-list { display: grid; gap: 8px; max-height: 455px; overflow: auto; }
+    .diagnostic { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 9px; padding: 11px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-raised); }
+    .diagnostic-icon { font-size: 13px; }
+    .diagnostic strong { display: block; font-size: 11px; }
+    .diagnostic p { margin: 3px 0 0; color: var(--color-muted); font-size: 10px; }
+    .diagnostic .source-location { display: block; margin-top: 5px; color: var(--color-accent-strong); font-family: var(--font-mono); font-size: 9px; }
+    .diagnostic.error .diagnostic-icon { color: var(--color-red); }
+    .diagnostic.warning .diagnostic-icon { color: var(--color-amber); }
+    .diagnostic.success .diagnostic-icon { color: var(--color-green); }
+    .diagnostic.info .diagnostic-icon { color: var(--color-cyan); }
+    .validation-placeholder { padding: 30px 16px; border: 1px dashed var(--color-border); border-radius: 12px; color: var(--color-muted); text-align: center; font-size: 11px; }
+
+    .adapter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+    .adapter-card { padding: 18px; }
+    .adapter-card h3 { margin: 0; font-size: 14px; }
+    .adapter-card > p { margin: 6px 0 13px; color: var(--color-muted); font-size: 11px; }
+    .adapter-row { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid var(--color-border); font-size: 10px; }
+    .adapter-row span:first-child { color: var(--color-muted); }
+
+    .notice { display: flex; gap: 11px; padding: 14px 15px; border: 1px solid color-mix(in srgb, var(--color-amber) 38%, var(--color-border)); border-radius: 12px; background: color-mix(in srgb, var(--color-amber) 7%, var(--color-surface)); }
+    .notice strong { display: block; margin-bottom: 3px; font-size: 11px; }
+    .notice p { margin: 0; color: var(--color-muted); font-size: 10px; }
+    .notice-icon { color: var(--color-amber); }
+
+    .request-box { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+    .htmx-indicator { opacity: 0; transition: opacity .2s ease; }
+    .htmx-request .htmx-indicator,
+    .htmx-request.htmx-indicator { opacity: 1; }
+    .request-output { min-height: 72px; margin-top: 10px; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-raised); color: var(--color-muted); font-family: var(--font-mono); font-size: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .request-status { margin-top: 7px; color: var(--color-muted); font-size: 10px; }
+
+    .docs-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+    .docs-card { padding: 18px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); }
+    .docs-card h3 { margin: 0 0 9px; font-size: 13px; }
+    .docs-card p, .docs-card li { color: var(--color-muted); font-size: 11px; }
+    .docs-card ul { margin: 8px 0 0; padding-left: 18px; }
+    .docs-card li + li { margin-top: 6px; }
+    .code-block { overflow-x: auto; margin: 10px 0 0; padding: 13px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-raised); color: var(--color-accent-strong); font-size: 10px; line-height: 1.6; }
+
+    .toast {
+      position: fixed;
+      z-index: 50;
+      right: 20px;
+      bottom: 20px;
+      max-width: min(360px, calc(100vw - 40px));
+      padding: 11px 14px;
+      border: 1px solid var(--color-border);
+      border-radius: 11px;
+      background: var(--color-surface-raised);
+      color: var(--color-text);
+      box-shadow: var(--shadow-soft);
+      font-size: 11px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity .18s ease, transform .18s ease;
+    }
+
+    .toast.is-visible { opacity: 1; transform: translateY(0); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 1100px) {
+      :root { --sidebar-width: 220px; }
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .validator-layout { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .app-shell { display: block; }
+      .sidebar { position: sticky; z-index: 20; height: auto; padding: 10px 13px; border-right: 0; border-bottom: 1px solid var(--color-border); }
+      .brand { padding: 2px 5px 10px; }
+      .brand-mark { width: 34px; height: 34px; border-radius: 10px; font-size: 16px; }
+      .brand-name { font-size: 12px; }
+      .brand-subtitle, .nav-label, .sidebar-note, .sidebar-footer, .sidebar-spacer { display: none; }
+      .nav-list { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+      .nav-button { width: auto; min-width: max-content; padding: 8px 10px; }
+      .nav-icon { width: auto; }
+      .nav-text { font-size: 10px; }
+      .topbar { min-height: 55px; padding: 9px 17px; }
+      .runtime-pill { display: none; }
+      .content { padding: 29px 17px 50px; }
+      .feature-grid, .adapter-grid, .docs-grid, .registry-grid { grid-template-columns: 1fr; }
+      .flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .section-heading { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (max-width: 450px) {
+      .metric-grid { gap: 8px; }
+      .metric-card { min-height: 100px; padding: 12px; }
+      .metric-value { font-size: 23px; }
+      .hero-actions .button { flex: 1 1 auto; }
+      .flow-grid { grid-template-columns: 1fr 1fr; }
+      .validation-summary { gap: 5px; }
+      .summary-item { padding: 9px; }
+      .summary-item strong { font-size: 18px; }
+      .request-box { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+  <script
+    src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.11/dist/htmx.min.js"
+    integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg"
+    crossorigin="anonymous"></script>
+</head>
+<body>
+  <div class="app-shell" data-component="application" data-runtime="javascript" data-storage="local">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">U</div>
+        <div>
+          <p class="brand-name">UNIFIED HTML5</p>
+          <p class="brand-subtitle">Compatibility architecture</p>
+        </div>
+      </div>
+
+      <p class="nav-label">Workspace</p>
+      <nav class="nav-list" aria-label="Workspace sections">
+        <button class="nav-button" type="button" data-view-target="overview" aria-current="page"><span class="nav-icon" aria-hidden="true">◈</span><span class="nav-text">Overview</span></button>
+        <button class="nav-button" type="button" data-view-target="registry"><span class="nav-icon" aria-hidden="true">▦</span><span class="nav-text">Component registry</span></button>
+        <button class="nav-button" type="button" data-view-target="validator"><span class="nav-icon" aria-hidden="true">⌁</span><span class="nav-text">Markup validator</span></button>
+        <button class="nav-button" type="button" data-view-target="adapters"><span class="nav-icon" aria-hidden="true">⧉</span><span class="nav-text">Runtime adapters</span></button>
+        <button class="nav-button" type="button" data-view-target="docs"><span class="nav-icon" aria-hidden="true">≡</span><span class="nav-text">Architecture notes</span></button>
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-note">
+        <strong>Architecture principle</strong>
+        <p>Share a stable interface. Keep each language in its native runtime.</p>
+      </div>
+      <div class="sidebar-footer">PROTOTYPE · 0.1.0 · HTML5 FIRST</div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="breadcrumb">Architecture / <strong id="breadcrumb-current">Overview</strong></div>
+        <div class="topbar-actions">
+          <span class="runtime-pill"><span class="status-dot" aria-hidden="true"></span><span id="htmx-status">Checking HTMX…</span></span>
+          <span class="version-pill">v0.1.0</span>
+          <button class="icon-button" id="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle color theme">◐</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="view is-active" id="view-overview" aria-labelledby="overview-title">
+          <div class="eyebrow">Architecture blueprint · Prototype</div>
+          <h1 id="overview-title">One HTML contract.<br><span class="accent">Multiple native runtimes.</span></h1>
+          <p class="hero-copy">A practical HTML5-first interface for identifying components, declaring interactions, and connecting language-specific adapters. HTMX handles HTML-over-the-wire requests; dedicated tools continue to compile and execute each language.</p>
+          <div class="hero-actions">
+            <button class="button button-primary" type="button" data-open-view="registry">Explore component registry <span aria-hidden="true">→</span></button>
+            <button class="button" type="button" data-open-view="validator">Run markup validation</button>
+          </div>
+
+          <div class="metric-grid" aria-label="Architecture metrics">
+            <article class="metric-card"><span class="metric-label">Registered components</span><strong class="metric-value" id="metric-components">6</strong><span class="metric-detail">Shared HTML identifiers</span></article>
+            <article class="metric-card"><span class="metric-label">Technology groups</span><strong class="metric-value">6</strong><span class="metric-detail">JS · TS · CSS · PHP · SQL · HTMX</span></article>
+            <article class="metric-card"><span class="metric-label">Build dependencies</span><strong class="metric-value">0</strong><span class="metric-detail">For this browser prototype</span></article>
+            <article class="metric-card"><span class="metric-label">Native validation</span><strong class="metric-value">5+</strong><span class="metric-detail">Language-specific toolchains required</span></article>
+          </div>
+
+          <div class="section-heading">
+            <div><span class="section-kicker">Core architecture</span><h2>Three layers, one contract</h2><p>Separate shared markup from runtime-specific implementation details.</p></div>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card"><div class="feature-icon" aria-hidden="true">⌘</div><h3>HTML5 contract</h3><p>Semantic elements, stable IDs, class names, and <code>data-*</code> attributes describe component identity and integration intent.</p></article>
+            <article class="feature-card"><div class="feature-icon" aria-hidden="true">↔</div><h3>HTMX interaction</h3><p>Declarative request attributes connect user interactions to server-rendered HTML fragments without coupling markup to a frontend framework.</p></article>
+            <article class="feature-card"><div class="feature-icon" aria-hidden="true">⌬</div><h3>Native adapters</h3><p>JavaScript, TypeScript, CSS preprocessors, PHP, and SQL retain their own compilers, runtimes, and validation tools.</p></article>
+          </div>
+
+          <div class="section-heading">
+            <div><span class="section-kicker">Execution pipeline</span><h2>From markup to implementation</h2><p>The contract coordinates tools; it does not replace them.</p></div>
+          </div>
+          <div class="flow-grid" aria-label="Execution pipeline">
+            <div class="flow-step"><span class="flow-number">01 / DECLARE</span><strong>HTML5 + data attributes</strong><span>Stable component interface</span></div>
+            <div class="flow-step"><span class="flow-number">02 / RESOLVE</span><strong>Component registry</strong><span>Map identifiers to adapters</span></div>
+            <div class="flow-step"><span class="flow-number">03 / BUILD</span><strong>Native toolchains</strong><span>Compile, bundle, or execute</span></div>
+            <div class="flow-step"><span class="flow-number">04 / VERIFY</span><strong>CI + runtime tests</strong><span>Validate each execution layer</span></div>
+          </div>
+
+          <div class="section-heading">
+            <div><span class="section-kicker">Compatibility boundaries</span><h2>What is shared and what is not</h2></div>
+          </div>
+          <div class="panel">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Technology</th><th>Integration boundary</th><th>Required native tool</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>HTML5 / HTMX</strong></td><td>Markup contract and HTTP interactions</td><td>Browser + optional HTMX library</td></tr>
+                  <tr><td><strong>JavaScript / TypeScript</strong></td><td>Client and application adapters</td><td>Browser / Node.js / TypeScript compiler</td></tr>
+                  <tr><td><strong>CSS / SCSS / SASS / LESS</strong></td><td>Selectors, tokens, generated styles</td><td>CSS engine + selected preprocessor</td></tr>
+                  <tr><td><strong>PHP</strong></td><td>HTTP endpoints and server-side logic</td><td>PHP interpreter and framework tooling</td></tr>
+                  <tr><td><strong>SQL</strong></td><td>Persistence adapter and query contract</td><td>Configured database engine or sql.js</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-registry" aria-labelledby="registry-title">
+          <div class="eyebrow">Shared interface</div>
+          <h1 class="page-title" id="registry-title">Component registry</h1>
+          <p class="page-description">A central registry maps stable HTML identifiers to responsibilities and implementation adapters. Keep identifiers small and descriptive; avoid embedding programming-language semantics in attributes.</p>
+          <div class="toolbar">
+            <input class="search-input" id="registry-search" type="search" placeholder="Filter components…" aria-label="Filter components">
+            <span class="muted" id="registry-count">6 registered components</span>
+          </div>
+          <div class="registry-grid" id="registry-grid"></div>
+        </section>
+
+        <section class="view" id="view-validator" aria-labelledby="validator-title">
+          <div class="eyebrow">Developer experience</div>
+          <h1 class="page-title" id="validator-title">Markup validator</h1>
+          <p class="page-description">Run browser-side structural checks against an HTML fragment. The validator checks registry identifiers, duplicate IDs, common HTMX attributes, and local target references. It is not a replacement for the Nu HTML Checker or language-specific compilers.</p>
+          <div class="validator-layout">
+            <article class="panel">
+              <div class="panel-header"><div><h3>HTML source</h3><p>Paste a component fragment or restore the example.</p></div><span class="tag">index.html</span></div>
+              <label class="sr-only" for="source-input">HTML source to validate</label>
+              <textarea class="code-input" id="source-input" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+              <div class="editor-footer">
+                <span class="editor-hint">Input is parsed as inert HTML; scripts are not executed.</span>
+                <div class="hero-actions" style="margin:0">
+                  <button class="button button-small" id="restore-sample" type="button">Restore sample</button>
+                  <button class="button button-primary button-small" id="run-validation" type="button">Run checks <span aria-hidden="true">↗</span></button>
+                </div>
+              </div>
+            </article>
+            <aside class="panel" aria-live="polite" aria-atomic="false">
+              <div class="panel-header"><div><h3>Validation report</h3><p id="validation-caption">Run checks to inspect the source.</p></div><span class="tag">Browser checks</span></div>
+              <div class="validation-summary">
+                <div class="summary-item"><strong id="count-errors">—</strong><span>Errors</span></div>
+                <div class="summary-item"><strong id="count-warnings">—</strong><span>Warnings</span></div>
+                <div class="summary-item"><strong id="count-passed">—</strong><span>Passed</span></div>
+              </div>
+              <div class="diagnostic-list" id="diagnostic-list"><div class="validation-placeholder">No report yet.<br>Run the checks to generate diagnostics.</div></div>
+            </aside>
+          </div>
+          <div class="notice" style="margin-top:14px">
+            <span class="notice-icon" aria-hidden="true">ⓘ</span>
+            <div><strong>Validation scope</strong><p>PHP syntax, SQL semantics, TypeScript types, and SCSS/SASS/LESS compilation cannot be verified by this static browser check. Run the native interpreter, compiler, or database engine in your build pipeline.</p></div>
+          </div>
+        </section>
+
+        <section class="view" id="view-adapters" aria-labelledby="adapters-title">
+          <div class="eyebrow">Native execution</div>
+          <h1 class="page-title" id="adapters-title">Runtime adapters</h1>
+          <p class="page-description">Adapters translate the shared component contract into concrete framework or service operations. The registry describes integration points; it does not pretend that unrelated runtimes are interchangeable.</p>
+          <div class="adapter-grid">
+            <article class="adapter-card"><h3>JavaScript ecosystem</h3><p>Browser behavior, application state, and client-side integration.</p><div class="adapter-row"><span>Examples</span><span>Alpine.js, Vue.js, Next.js, Nuxt.js, Node.js, LocalStorage, hyperscript, Motion One</span></div><div class="adapter-row"><span>Adapter contract</span><span><code>mount(element, config)</code> / <code>destroy(element)</code></span></div><div class="adapter-row"><span>Validation</span><span>ESLint, unit tests, browser tests, framework build</span></div></article>
+            <article class="adapter-card"><h3>TypeScript</h3><p>Typed contracts for component configuration and adapter APIs.</p><div class="adapter-row"><span>Examples</span><span>Types, interfaces, generics, declarations</span></div><div class="adapter-row"><span>Adapter contract</span><span>Typed registry definitions and generated declarations</span></div><div class="adapter-row"><span>Validation</span><span><code>tsc --noEmit</code> and project type tests</span></div></article>
+            <article class="adapter-card"><h3>CSS and preprocessors</h3><p>Shared design tokens and stable selectors feed native stylesheet outputs.</p><div class="adapter-row"><span>Examples</span><span>Tailwind CSS, Bootstrap, EaseMotion CSS, SCSS, SASS, LESS</span></div><div class="adapter-row"><span>Adapter contract</span><span>CSS custom properties, component classes, token mapping</span></div><div class="adapter-row"><span>Validation</span><span>Preprocessor compilation, stylelint, visual regression tests</span></div></article>
+            <article class="adapter-card"><h3>PHP backend</h3><p>Server endpoints receive HTTP requests and return HTML fragments or other documented responses.</p><div class="adapter-row"><span>Examples</span><span>PHP application logic and PHP framework routes</span></div><div class="adapter-row"><span>Adapter contract</span><span>HTTP method, route, request parameters, response format</span></div><div class="adapter-row"><span>Validation</span><span><code>php -l</code>, integration tests, framework tests</span></div></article>
+            <article class="adapter-card"><h3>SQL persistence</h3><p>Database operations stay behind a persistence boundary.</p><div class="adapter-row"><span>Examples</span><span>PostgreSQL, MySQL, SQLite, sql.js</span></div><div class="adapter-row"><span>Adapter contract</span><span>Repository methods, parameterized queries, migrations</span></div><div class="adapter-row"><span>Validation</span><span>Engine-specific parser, migration tests, transaction tests</span></div></article>
+            <article class="adapter-card"><h3>Browser runtime bridges</h3><p>Optional runtimes and libraries can be connected through explicit adapters; they are not equivalent execution environments.</p><div class="adapter-row"><span>Examples</span><span>php.js, sql.js, PyScript</span></div><div class="adapter-row"><span>Boundary</span><span>php.js is not a PHP server runtime; sql.js provides browser-side SQLite; PyScript runs Python in supported browser contexts.</span></div><div class="adapter-row"><span>Validation</span><span>Library-specific runtime tests and browser integration tests</span></div></article>
+            <article class="adapter-card"><h3>HTMX transport</h3><p>Declarative attributes request server responses and swap returned HTML into targets.</p><div class="adapter-row"><span>Examples</span><span><code>hx-get</code>, <code>hx-post</code>, <code>hx-target</code>, <code>hx-swap</code></span></div><div class="adapter-row"><span>Adapter contract</span><span>HTTP endpoint + HTML response + swap strategy</span></div><div class="adapter-row"><span>Validation</span><span>Attribute checks, endpoint integration tests, response tests</span></div></article>
+          </div>
+
+          <div class="section-heading"><div><span class="section-kicker">Live integration</span><h2>HTMX endpoint tester</h2><p>This request uses HTMX 2.x and expects an endpoint on the current origin.</p></div></div>
+          <div class="panel">
+            <div class="panel-header"><div><h3>GET /api/health</h3><p>Edit the endpoint in the HTML source to match your backend route.</p></div><span class="tag">HTTP / HTML</span></div>
+            <button class="button button-primary button-small" id="htmx-request" type="button" hx-get="/api/health" hx-target="#htmx-response" hx-swap="innerHTML" hx-indicator="#request-spinner">Send HTMX request <span aria-hidden="true">↗</span></button>
+            <span id="request-spinner" class="muted htmx-indicator" style="margin-left:9px;font-size:10px">Request in progress…</span>
+            <div class="request-status" id="request-status">Waiting for a request. A static file server does not provide this API route by default.</div>
+            <div class="request-output" id="htmx-response" aria-live="polite">Server response will appear here.</div>
+          </div>
+          <div class="notice" style="margin-top:14px"><span class="notice-icon" aria-hidden="true">ⓘ</span><div><strong>Endpoint requirement</strong><p>The sample route is intentionally not implemented in this two-file frontend. Connect a PHP/Node/etc. server that returns an HTML fragment before sending the request.</p></div></div>
+        </section>
+
+        <section class="view" id="view-docs" aria-labelledby="docs-title">
+          <div class="eyebrow">Implementation guide</div>
+          <h1 class="page-title" id="docs-title">Architecture notes</h1>
+          <p class="page-description">A migration-friendly set of conventions for adopting a shared interface while preserving each toolchain's native responsibilities.</p>
+          <div class="docs-grid">
+            <article class="docs-card"><h3>1. Markup contract</h3><p>Use semantic HTML first. Reserve <code>data-component</code> for registry identity and <code>data-*</code> attributes for small, documented configuration values.</p><ul><li>Use IDs for unique document targets.</li><li>Use classes for styling and reusable visual states.</li><li>Use ARIA attributes for accessibility, not runtime configuration.</li></ul></article>
+            <article class="docs-card"><h3>2. Adapter lifecycle</h3><p>Each adapter should expose a narrow lifecycle and avoid owning unrelated application state.</p><pre class="code-block"><code>interface ComponentAdapter {
+  mount(element: HTMLElement, config: ComponentConfig): void;
+  destroy?(element: HTMLElement): void;
+}</code></pre></article>
+            <article class="docs-card"><h3>3. HTMX request flow</h3><p>Keep request behavior declarative and return HTML fragments designed for the target region.</p><pre class="code-block"><code>&lt;button
+  hx-get="/api/status"
+  hx-target="#status-result"
+  hx-swap="innerHTML"
+&gt;
+  Refresh status
+&lt;/button&gt;</code></pre></article>
+            <article class="docs-card"><h3>4. Design tokens</h3><p>Define semantic CSS custom properties once, then map framework tokens to these stable names when needed.</p><pre class="code-block"><code>:root {
+  --color-accent: #496fe0;
+  --surface-primary: #ffffff;
+  --radius-control: 0.65rem;
+}</code></pre></article>
+            <article class="docs-card"><h3>5. Build pipeline</h3><ul><li>Validate HTML and HTMX integration metadata.</li><li>Run ESLint and TypeScript compiler checks.</li><li>Compile selected SCSS/SASS/LESS sources.</li><li>Run PHP lint and framework tests.</li><li>Apply migrations and execute database tests.</li><li>Run browser, accessibility, and end-to-end tests.</li></ul></article>
+            <article class="docs-card"><h3>6. Incremental migration</h3><p>Adopt the contract one component at a time. Wrap existing framework components with stable markup rather than rewriting their internals.</p><ul><li>Document ownership of each component.</li><li>Define adapter-specific teardown behavior.</li><li>Keep backend routes versioned and explicit.</li><li>Remove duplicate implementations only after parity tests pass.</li></ul></article>
+          </div>
+          <div class="section-heading"><div><span class="section-kicker">Suggested policy</span><h2>Contract rules</h2></div></div>
+          <div class="panel"><div class="table-wrap"><table><thead><tr><th>Rule</th><th>Recommendation</th></tr></thead><tbody><tr><td>Identifiers</td><td>Use stable, lowercase kebab-case names.</td></tr><tr><td>Configuration</td><td>Prefer documented <code>data-*</code> values; validate allowed values.</td></tr><tr><td>Transport</td><td>Use HTMX for HTML-over-the-wire; define JSON APIs separately when required.</td></tr><tr><td>Security</td><td>Validate input on the server, authorize every endpoint, and use parameterized SQL.</td></tr><tr><td>Compilation</td><td>Do not attempt to compile server languages or preprocessors inside an HTML-only runtime.</td></tr></tbody></table></div></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const SAMPLE_MARKUP = `<section
+  id="application-container"
+  class="app-container"
+  data-component="application"
+  data-runtime="javascript"
+  data-storage="local"
+>
+  <button
+    id="action-button"
+    class="action-button"
+    type="button"
+    data-component="action"
+    data-action="fetch-status"
+    hx-get="/api/action"
+    hx-target="#result"
+    hx-swap="innerHTML"
+  >
+    Execute
+  </button>
+
+  <div
+    id="result"
+    class="result-container"
+    data-component="result"
+    aria-live="polite"
+  ></div>
+</section>`;
+
+      const COMPONENTS = [
+        { name: 'Application container', id: 'application', htmlId: 'app-container', responsibility: 'Root component context, initialization boundary, and shared configuration.', attributes: ['data-component', 'data-runtime', 'data-storage'], adapter: 'Application bootstrap' },
+        { name: 'Action control', id: 'action', htmlId: 'action-button', responsibility: 'User-triggered actions and declarative request metadata.', attributes: ['data-action', 'hx-get', 'hx-post', 'hx-target'], adapter: 'HTMX / JavaScript' },
+        { name: 'Result region', id: 'result', htmlId: 'result-container', responsibility: 'Stable target for server fragments, status updates, and accessible announcements.', attributes: ['aria-live', 'hx-swap'], adapter: 'HTMX / DOM' },
+        { name: 'Form', id: 'form', htmlId: 'app-form', responsibility: 'Form boundary for browser validation and server submission.', attributes: ['data-validator', 'data-api', 'hx-post'], adapter: 'HTML Forms / HTMX' },
+        { name: 'Field', id: 'field', htmlId: 'form-field', responsibility: 'A single input and its label, validation state, and help text.', attributes: ['data-validator', 'aria-describedby', 'required'], adapter: 'HTML Forms / JavaScript' },
+        { name: 'Status panel', id: 'status', htmlId: 'status-panel', responsibility: 'Readable application state and asynchronous operation feedback.', attributes: ['data-state', 'role', 'aria-live'], adapter: 'DOM / framework adapter' }
+      ];
+
+      const VALID_COMPONENTS = new Set(COMPONENTS.map((item) => item.id));
+      const VALID_RUNTIMES = new Set(['browser', 'javascript', 'typescript', 'php', 'sql']);
+      const VALID_STORAGE = new Set(['none', 'local', 'session', 'indexeddb']);
+      const VALID_SWAPS = new Set(['innerHTML', 'outerHTML', 'beforebegin', 'afterbegin', 'beforeend', 'afterend', 'delete', 'none']);
+      const KNOWN_HTMX_ATTRIBUTES = new Set([
+        'hx-get', 'hx-post', 'hx-put', 'hx-patch', 'hx-delete', 'hx-trigger', 'hx-target', 'hx-swap',
+        'hx-swap-oob', 'hx-push-url', 'hx-replace-url', 'hx-select', 'hx-select-oob', 'hx-vals',
+        'hx-headers', 'hx-include', 'hx-params', 'hx-confirm', 'hx-prompt', 'hx-sync', 'hx-indicator',
+        'hx-encoding', 'hx-disabled-elt', 'hx-inherit', 'hx-history-elt', 'hx-history', 'hx-boost',
+        'hx-ext', 'hx-validate', 'hx-request', 'hx-preserve', 'hx-on'
+      ]);
+
+      const byId = (id) => document.getElementById(id);
+      let toastTimeout = 0;
+
+      function showToast(message) {
+        const toast = byId('toast');
+        toast.textContent = message;
+        toast.classList.add('is-visible');
+        window.clearTimeout(toastTimeout);
+        toastTimeout = window.setTimeout(() => toast.classList.remove('is-visible'), 2300);
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[character]);
+      }
+
+      function renderRegistry(filter = '') {
+        const grid = byId('registry-grid');
+        const normalizedFilter = filter.trim().toLowerCase();
+        const matches = COMPONENTS.filter((component) => {
+          const searchable = [component.name, component.id, component.htmlId, component.responsibility, component.adapter, ...component.attributes].join(' ').toLowerCase();
+          return searchable.includes(normalizedFilter);
+        });
+
+        byId('registry-count').textContent = `${matches.length} of ${COMPONENTS.length} registered components`;
+        grid.replaceChildren();
+
+        if (matches.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'No components match this filter.';
+          grid.append(empty);
+          return;
+        }
+
+        matches.forEach((component) => {
+          const article = document.createElement('article');
+          article.className = 'registry-card';
+          const tags = component.attributes.map((attribute) => `<span class="tag">${escapeHtml(attribute)}</span>`).join('');
+          article.innerHTML = `
+            <div class="registry-card-top">
+              <div><h3>${escapeHtml(component.name)}</h3><span class="registry-id">${escapeHtml(component.id)}</span></div>
+              <button class="button button-small" type="button" data-copy-component="${escapeHtml(component.id)}">Copy ID</button>
+            </div>
+            <p>${escapeHtml(component.responsibility)}</p>
+            <div class="registry-meta"><span class="tag">.${escapeHtml(component.htmlId)}</span>${tags}</div>
+            <p class="muted" style="margin-bottom:0">Adapter: ${escapeHtml(component.adapter)}</p>`;
+          grid.append(article);
+        });
+      }
+
+      function setActiveView(viewName) {
+        const safeName = ['overview', 'registry', 'validator', 'adapters', 'docs'].includes(viewName) ? viewName : 'overview';
+        document.querySelectorAll('.view').forEach((view) => view.classList.toggle('is-active', view.id === `view-${safeName}`));
+        document.querySelectorAll('[data-view-target]').forEach((button) => {
+          if (button.dataset.viewTarget === safeName) button.setAttribute('aria-current', 'page');
+          else button.removeAttribute('aria-current');
+        });
+        const label = safeName === 'registry' ? 'Component registry' : safeName === 'validator' ? 'Markup validator' : safeName === 'adapters' ? 'Runtime adapters' : safeName === 'docs' ? 'Architecture notes' : 'Overview';
+        byId('breadcrumb-current').textContent = label;
+        window.history.replaceState(null, '', `#${safeName}`);
+      }
+
+      function lineAt(source, index) {
+        if (index < 0) return null;
+        return source.slice(0, index).split('\n').length;
+      }
+
+      function findAttributeLine(source, attribute, value, occurrence = 0) {
+        const escapedAttribute = attribute.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedValue = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const expression = new RegExp(`${escapedAttribute}\\s*=\\s*(["'])${escapedValue}\\1`, 'gi');
+        let match;
+        let current = 0;
+        while ((match = expression.exec(source)) !== null) {
+          if (current === occurrence) return lineAt(source, match.index);
+          current += 1;
+        }
+        return null;
+      }
+
+      function validateMarkup(source) {
+        const diagnostics = [];
+        const add = (severity, title, message, line = null) => diagnostics.push({ severity, title, message, line });
+        const normalizedSource = source.trim();
+
+        if (!normalizedSource) {
+          add('error', 'Empty source', 'Paste an HTML fragment before running validation.');
+          return diagnostics;
+        }
+
+        const parser = new DOMParser();
+        const parsed = parser.parseFromString(normalizedSource, 'text/html');
+        const elements = Array.from(parsed.body.querySelectorAll('*'));
+        const idMap = new Map();
+
+        if (elements.length === 0) add('warning', 'No elements found', 'The source does not contain an HTML element.');
+
+        elements.forEach((element) => {
+          const id = element.getAttribute('id');
+          if (id) {
+            const count = idMap.get(id) || 0;
+            idMap.set(id, count + 1);
+            if (count > 0) {
+              add('error', 'Duplicate ID', `The ID "${id}" is used more than once. IDs must be unique in a document.`, findAttributeLine(normalizedSource, 'id', id, count));
+            }
+          }
+
+          const component = element.getAttribute('data-component');
+          if (component && !VALID_COMPONENTS.has(component)) {
+            add('error', 'Unknown component', `"${component}" is not registered. Add it to COMPONENTS or correct the identifier.`, findAttributeLine(normalizedSource, 'data-component', component));
+          }
+
+          const runtime = element.getAttribute('data-runtime');
+          if (runtime && !VALID_RUNTIMES.has(runtime)) {
+            add('error', 'Unsupported runtime label', `"${runtime}" is not an allowed runtime label. Use: ${Array.from(VALID_RUNTIMES).join(', ')}.`, findAttributeLine(normalizedSource, 'data-runtime', runtime));
+          }
+
+          const storage = element.getAttribute('data-storage');
+          if (storage && !VALID_STORAGE.has(storage)) {
+            add('error', 'Unsupported storage label', `"${storage}" is not an allowed storage value. Use: ${Array.from(VALID_STORAGE).join(', ')}.`, findAttributeLine(normalizedSource, 'data-storage', storage));
+          }
+
+          const hxTarget = element.getAttribute('hx-target') || element.getAttribute('data-hx-target');
+          if (hxTarget) {
+            const target = hxTarget.trim();
+            const extendedTarget = /^(this|body|document|window|closest\s|find\s|next(\s|$)|previous(\s|$))/i.test(target);
+            if (!extendedTarget) {
+              try {
+                if (!parsed.querySelector(target)) {
+                  add('error', 'HTMX target not found', `The target selector "${target}" does not match an element in this fragment.`, findAttributeLine(normalizedSource, element.hasAttribute('hx-target') ? 'hx-target' : 'data-hx-target', hxTarget));
+                }
+              } catch (error) {
+                add('error', 'Invalid HTMX target selector', `"${target}" is not a valid CSS selector (${error.message}).`, findAttributeLine(normalizedSource, element.hasAttribute('hx-target') ? 'hx-target' : 'data-hx-target', hxTarget));
+              }
+            }
+          }
+
+          const hxSwap = element.getAttribute('hx-swap') || element.getAttribute('data-hx-swap');
+          if (hxSwap) {
+            const swapMode = hxSwap.trim().split(/\s+/)[0];
+            if (!VALID_SWAPS.has(swapMode)) {
+              add('error', 'Unsupported HTMX swap mode', `"${swapMode}" is not a recognized core swap mode.`, findAttributeLine(normalizedSource, element.hasAttribute('hx-swap') ? 'hx-swap' : 'data-hx-swap', hxSwap));
+            }
+          }
+
+          ['hx-get', 'hx-post', 'hx-put', 'hx-patch', 'hx-delete', 'data-hx-get', 'data-hx-post', 'data-hx-put', 'data-hx-patch', 'data-hx-delete'].forEach((attribute) => {
+            if (element.hasAttribute(attribute) && !element.getAttribute(attribute).trim()) {
+              add('error', 'Empty HTMX endpoint', `${attribute} must contain a non-empty endpoint path or URL.`, findAttributeLine(normalizedSource, attribute, ''));
+            }
+          });
+
+          const dataApi = element.getAttribute('data-api');
+          if (dataApi && !(/^(\/|https?:\/\/)/i.test(dataApi.trim()))) {
+            add('warning', 'Ambiguous API reference', 'Use a root-relative path (/) or an absolute HTTP(S) URL for data-api.', findAttributeLine(normalizedSource, 'data-api', dataApi));
+          }
+
+          Array.from(element.attributes).forEach((attribute) => {
+            const name = attribute.name.toLowerCase();
+            if (/^on[a-z]/.test(name)) {
+              add('warning', 'Inline event handler', `${name} couples behavior to markup. Prefer an adapter or external event listener.`, findAttributeLine(normalizedSource, name, attribute.value));
+            }
+            if (name.startsWith('hx-') || name.startsWith('data-hx-')) {
+              const normalizedName = name.startsWith('data-') ? name.slice(5) : name;
+              const isKnown = KNOWN_HTMX_ATTRIBUTES.has(normalizedName) || normalizedName.startsWith('hx-on:');
+              if (!isKnown) add('warning', 'Unrecognized HTMX attribute', `${name} is not in this prototype's core attribute allowlist. Check the HTMX version or installed extensions.`, findAttributeLine(normalizedSource, name, attribute.value));
+            }
+          });
+        });
+
+        if (idMap.size > 0 && Array.from(idMap.values()).every((count) => count === 1)) {
+          add('success', 'Unique IDs', `${idMap.size} ID${idMap.size === 1 ? '' : 's'} found; no duplicates detected.`);
+        }
+
+        const componentCount = elements.filter((element) => element.hasAttribute('data-component')).length;
+        if (componentCount > 0) add('success', 'Component metadata', `${componentCount} element${componentCount === 1 ? '' : 's'} declare data-component metadata.`);
+
+        const htmxCount = elements.reduce((total, element) => total + Array.from(element.attributes).filter((attribute) => attribute.name.startsWith('hx-') || attribute.name.startsWith('data-hx-')).length, 0);
+        if (htmxCount > 0) add('success', 'HTMX attributes detected', `${htmxCount} HTMX-related attribute${htmxCount === 1 ? '' : 's'} detected. Endpoint behavior still requires an available server route.`);
+        else add('info', 'No HTMX attributes', 'No hx-* or data-hx-* attributes were found in this fragment.');
+
+        if (/\<\?php|\<\?=/i.test(source)) {
+          add('info', 'PHP code detected', 'This browser validator does not execute or lint PHP. Run php -l against the PHP source file.');
+        }
+        if (/\b(SELECT|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|CREATE\s+TABLE)\b/i.test(source)) {
+          add('info', 'SQL-like text detected', 'SQL syntax and schema compatibility must be tested with the configured database engine.');
+        }
+        add('info', 'Native toolchains not executed', 'This report covers browser-side markup metadata only; run TypeScript, CSS preprocessor, PHP, and SQL checks in CI.');
+
+        if (!diagnostics.some((item) => item.severity === 'error')) {
+          add('success', 'No blocking markup issues', 'No errors were found by this prototype validator. This is not a complete HTML conformance certification.');
+        }
+
+        return diagnostics;
+      }
+
+      function renderDiagnostics(diagnostics) {
+        const list = byId('diagnostic-list');
+        const errors = diagnostics.filter((item) => item.severity === 'error').length;
+        const warnings = diagnostics.filter((item) => item.severity === 'warning').length;
+        const passed = diagnostics.filter((item) => item.severity === 'success').length;
+
+        byId('count-errors').textContent = String(errors);
+        byId('count-warnings').textContent = String(warnings);
+        byId('count-passed').textContent = String(passed);
+        byId('validation-caption').textContent = `${diagnostics.length} diagnostic${diagnostics.length === 1 ? '' : 's'} generated`;
+        list.replaceChildren();
+
+        diagnostics.forEach((item) => {
+          const article = document.createElement('article');
+          article.className = `diagnostic ${item.severity}`;
+          const icon = item.severity === 'error' ? '!' : item.severity === 'warning' ? '⚠' : item.severity === 'success' ? '✓' : 'i';
+          const iconElement = document.createElement('span');
+          iconElement.className = 'diagnostic-icon';
+          iconElement.setAttribute('aria-hidden', 'true');
+          iconElement.textContent = icon;
+          const content = document.createElement('div');
+          const title = document.createElement('strong');
+          title.textContent = item.title;
+          const message = document.createElement('p');
+          message.textContent = item.message;
+          content.append(title, message);
+          if (item.line !== null) {
+            const location = document.createElement('span');
+            location.className = 'source-location';
+            location.textContent = `index.html:${item.line}`;
+            content.append(location);
+          }
+          article.append(iconElement, content);
+          list.append(article);
+        });
+      }
+
+      async function copyText(value) {
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(value);
+          } else {
+            const temporary = document.createElement('textarea');
+            temporary.value = value;
+            temporary.setAttribute('readonly', '');
+            temporary.style.position = 'fixed';
+            temporary.style.opacity = '0';
+            document.body.append(temporary);
+            temporary.select();
+            const copied = document.execCommand('copy');
+            temporary.remove();
+            if (!copied) throw new Error('Clipboard access was not granted.');
+          }
+          showToast('Copied to clipboard.');
+        } catch (error) {
+          showToast(error.message || 'Could not copy to clipboard.');
+        }
+      }
+
+      function initializeTheme() {
+        let savedTheme = null;
+        try { savedTheme = localStorage.getItem('unified-html5-theme'); } catch (error) { /* Storage may be unavailable. */ }
+        if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+        byId('theme-toggle').addEventListener('click', () => {
+          const nextTheme = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+          if (nextTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+          else document.documentElement.removeAttribute('data-theme');
+          try { localStorage.setItem('unified-html5-theme', nextTheme); } catch (error) { showToast('Theme changed, but browser storage is unavailable.'); }
+        });
+      }
+
+      function initializeHtmxStatus() {
+        const status = byId('htmx-status');
+        if (window.htmx) {
+          status.textContent = `HTMX ${window.htmx.version || 'loaded'}`;
+        } else {
+          status.textContent = 'HTMX unavailable';
+          status.parentElement.title = 'The CDN library could not be loaded. Markup inspection remains available.';
+        }
+
+        document.body.addEventListener('htmx:beforeRequest', () => {
+          byId('request-status').textContent = 'Sending request…';
+        });
+        document.body.addEventListener('htmx:afterRequest', (event) => {
+          const detail = event.detail || {};
+          if (detail.successful) {
+            byId('request-status').textContent = `Request completed (HTTP ${detail.xhr ? detail.xhr.status : 'success'}).`;
+          }
+        });
+        document.body.addEventListener('htmx:responseError', (event) => {
+          const statusCode = event.detail && event.detail.xhr ? event.detail.xhr.status : 'unknown';
+          byId('request-status').textContent = `Server returned HTTP ${statusCode}. Check that /api/health exists and returns an HTML fragment.`;
+        });
+        document.body.addEventListener('htmx:sendError', () => {
+          byId('request-status').textContent = 'Network error. The endpoint may be unavailable or blocked by the browser.';
+        });
+        document.body.addEventListener('htmx:timeout', () => {
+          byId('request-status').textContent = 'Request timed out.';
+        });
+      }
+
+      function initializeNavigation() {
+        document.querySelectorAll('[data-view-target]').forEach((button) => {
+          button.addEventListener('click', () => setActiveView(button.dataset.viewTarget));
+        });
+        document.querySelectorAll('[data-open-view]').forEach((button) => {
+          button.addEventListener('click', () => setActiveView(button.dataset.openView));
+        });
+        window.addEventListener('hashchange', () => setActiveView(window.location.hash.slice(1)));
+        const initialView = window.location.hash.replace(/^#/, '');
+        if (initialView) setActiveView(initialView);
+      }
+
+      function initializeValidator() {
+        const input = byId('source-input');
+        input.value = SAMPLE_MARKUP;
+        byId('restore-sample').addEventListener('click', () => {
+          input.value = SAMPLE_MARKUP;
+          renderDiagnostics(validateMarkup(input.value));
+          showToast('Sample markup restored.');
+        });
+        byId('run-validation').addEventListener('click', () => {
+          renderDiagnostics(validateMarkup(input.value));
+        });
+        input.addEventListener('keydown', (event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+            event.preventDefault();
+            renderDiagnostics(validateMarkup(input.value));
+          }
+        });
+        renderDiagnostics(validateMarkup(input.value));
+      }
+
+      function initializeRegistry() {
+        renderRegistry();
+        byId('metric-components').textContent = String(COMPONENTS.length);
+        byId('registry-search').addEventListener('input', (event) => renderRegistry(event.target.value));
+        byId('registry-grid').addEventListener('click', (event) => {
+          const button = event.target.closest('[data-copy-component]');
+          if (!button) return;
+          copyText(button.dataset.copyComponent);
+        });
+      }
+
+      function initializeHtmxRequestButton() {
+        const button = byId('htmx-request');
+        if (!window.htmx) {
+          button.disabled = true;
+          byId('request-status').textContent = 'HTMX could not be loaded. Check network access or self-host the HTMX script.';
+        }
+      }
+
+      function initialize() {
+        initializeTheme();
+        initializeNavigation();
+        initializeRegistry();
+        initializeValidator();
+        initializeHtmxStatus();
+        initializeHtmxRequestButton();
+      }
+
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });
+      else initialize();
+    })();
+  </script>
+</body>
+</html>
